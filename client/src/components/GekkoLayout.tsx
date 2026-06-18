@@ -5,12 +5,12 @@ import {
   BarChart3,
   BookOpen,
   CheckSquare,
-  ChevronRight,
   LogOut,
   Upload,
   Zap,
+  ChevronDown,
 } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import QuickTaskFAB from "./gekko/QuickTaskFAB";
 
@@ -26,8 +26,10 @@ interface GekkoLayoutProps {
 }
 
 export default function GekkoLayout({ children }: GekkoLayoutProps) {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [location, navigate] = useLocation();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Fetch publish queue badge count
   const { data: allTasks } = trpc.tasks.getAll.useQuery(
@@ -38,6 +40,17 @@ export default function GekkoLayout({ children }: GekkoLayoutProps) {
   const publishPendingCount = (allTasks ?? []).filter(
     (t) => (t.publish_ready || (t.status === "done" && t.agent_type === "worker_agent")) && !t.published
   ).length;
+
+  // Close user menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -66,93 +79,90 @@ export default function GekkoLayout({ children }: GekkoLayoutProps) {
   if (!isAuthenticated) return null;
 
   const navItems: NavItem[] = [
-    { label: "Overview", path: "/", icon: <BarChart3 size={18} /> },
-    { label: "Gai Daily Brief", path: "/brief", icon: <BookOpen size={18} /> },
-    { label: "Task Dashboard", path: "/tasks", icon: <CheckSquare size={18} /> },
+    { label: "Overview", path: "/", icon: <BarChart3 size={15} /> },
+    { label: "Gai Daily Brief", path: "/brief", icon: <BookOpen size={15} /> },
+    { label: "Task Dashboard", path: "/tasks", icon: <CheckSquare size={15} /> },
     {
       label: "Publish Queue",
       path: "/publish",
-      icon: <Upload size={18} />,
+      icon: <Upload size={15} />,
       badge: publishPendingCount > 0 ? publishPendingCount : undefined,
     },
   ];
 
-  const handleNavClick = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const isActive = (path: string) => {
-    if (path === "/") return location === "/";
+    if (path === "/") return location === "/" || location === "";
     return location.startsWith(path);
   };
 
   return (
     <div
-      className="flex min-h-screen"
+      className="min-h-screen flex flex-col"
       style={{ backgroundColor: "var(--gekko-black)", fontFamily: "'Nunito', sans-serif" }}
     >
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside
-        className="flex flex-col w-60 shrink-0 fixed top-0 left-0 h-full z-40"
+      {/* ── Top Nav ──────────────────────────────────────────────────────── */}
+      <header
+        className="sticky top-0 z-40 flex items-center gap-0"
         style={{
           backgroundColor: "var(--gekko-sidebar, #16161b)",
-          borderRight: "1px solid var(--gekko-border)",
+          borderBottom: "1px solid var(--gekko-border)",
+          height: "52px",
         }}
       >
         {/* Logo */}
         <div
-          className="flex items-center gap-2 px-5 py-5"
-          style={{ borderBottom: "1px solid var(--gekko-border)" }}
+          className="flex items-center gap-2 px-5 shrink-0"
+          style={{ borderRight: "1px solid var(--gekko-border)", height: "100%" }}
         >
           <div
-            className="flex items-center justify-center w-8 h-8 rounded-md"
+            className="flex items-center justify-center w-7 h-7 rounded-md"
             style={{ backgroundColor: "var(--gekko-green)", color: "#000" }}
           >
-            <Zap size={16} strokeWidth={2.5} />
+            <Zap size={14} strokeWidth={2.5} />
           </div>
           <div>
-            <div className="text-white font-bold text-sm leading-tight">GekkoFlow</div>
-            <div className="text-xs leading-tight" style={{ color: "var(--gekko-green)" }}>
+            <div className="text-white font-black text-sm leading-tight tracking-tight">GekkoFlow</div>
+            <div className="text-xs leading-tight font-semibold" style={{ color: "var(--gekko-green)", fontSize: "10px" }}>
               Command Centre
             </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* Nav items */}
+        <nav className="flex items-center flex-1 px-2 h-full overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {navItems.map((item) => {
             const active = isActive(item.path);
             return (
               <Link
                 key={item.path}
                 href={item.path}
-                onClick={handleNavClick}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-semibold transition-all duration-150 group"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="relative flex items-center gap-2 px-4 h-full text-sm font-bold transition-colors duration-150 whitespace-nowrap shrink-0"
                 style={{
-                  backgroundColor: active ? "var(--gekko-green-glow, rgba(0,255,65,0.12))" : "transparent",
-                  color: active ? "var(--gekko-green)" : "rgba(255,255,255,0.8)",
-                  border: active ? "1px solid var(--gekko-green-border, rgba(0,255,65,0.25))" : "1px solid transparent",
+                  color: active ? "var(--gekko-green)" : "rgba(255,255,255,0.65)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.95)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.65)";
                 }}
               >
-                <span
-                  style={{ color: active ? "var(--gekko-green)" : "rgba(255,255,255,0.5)" }}
-                  className="transition-colors duration-150 group-hover:text-white"
-                >
-                  {item.icon}
-                </span>
-                <span className="flex-1 truncate">{item.label}</span>
+                <span style={{ color: "inherit" }}>{item.icon}</span>
+                {item.label}
                 {item.badge !== undefined && (
                   <span
-                    className="flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold"
-                    style={{ backgroundColor: "var(--gekko-green)", color: "#000" }}
+                    className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-xs font-black"
+                    style={{ backgroundColor: "var(--gekko-green)", color: "#000", fontSize: "10px" }}
                   >
                     {item.badge > 9 ? "9+" : item.badge}
                   </span>
                 )}
+                {/* Active underline indicator */}
                 {active && (
-                  <ChevronRight
-                    size={14}
-                    style={{ color: "var(--gekko-green)" }}
+                  <span
+                    className="absolute bottom-0 left-0 right-0 h-[2px] rounded-t-full"
+                    style={{ backgroundColor: "var(--gekko-green)" }}
                   />
                 )}
               </Link>
@@ -160,40 +170,76 @@ export default function GekkoLayout({ children }: GekkoLayoutProps) {
           })}
         </nav>
 
-        {/* User footer */}
-        <div
-          className="px-4 py-4"
-          style={{ borderTop: "1px solid var(--gekko-border)" }}
-        >
-          <div className="flex items-center gap-3 mb-3">
+        {/* User menu */}
+        <div className="relative shrink-0 px-3" ref={userMenuRef}>
+          <button
+            onClick={() => setUserMenuOpen((o) => !o)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors duration-150"
+            style={{
+              backgroundColor: userMenuOpen ? "rgba(255,255,255,0.07)" : "transparent",
+              border: "1px solid transparent",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = userMenuOpen ? "rgba(255,255,255,0.07)" : "transparent")}
+          >
             <div
-              className="flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shrink-0"
+              className="flex items-center justify-center w-7 h-7 rounded-full text-xs font-black shrink-0"
               style={{ backgroundColor: "var(--gekko-green)", color: "#000" }}
             >
               {user?.name?.charAt(0)?.toUpperCase() ?? "E"}
             </div>
-            <div className="min-w-0">
-              <div className="text-white text-sm font-semibold truncate">{user?.name ?? "Eswan"}</div>
-              <div className="text-xs truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
-                {user?.email ?? "GekkoTech"}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/api/auth/logout")}
-            className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-colors duration-150"
-            style={{ color: "rgba(255,255,255,0.5)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "white")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
-          >
-            <LogOut size={13} />
-            Sign out
+            <span className="text-sm font-bold text-white hidden sm:block max-w-[120px] truncate">
+              {user?.name?.split(" ")[0] ?? "Eswan"}
+            </span>
+            <ChevronDown
+              size={13}
+              className="transition-transform duration-150"
+              style={{
+                color: "rgba(255,255,255,0.5)",
+                transform: userMenuOpen ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
           </button>
-        </div>
-      </aside>
 
-      {/* ── Main content ────────────────────────────────────────────────── */}
-      <main className="flex-1 ml-60 min-h-screen" style={{ backgroundColor: "var(--gekko-black)" }}>
+          {/* Dropdown */}
+          {userMenuOpen && (
+            <div
+              className="absolute right-0 top-full mt-1 w-52 rounded-xl py-1 z-50"
+              style={{
+                backgroundColor: "#1e1e28",
+                border: "1px solid var(--gekko-border)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div className="px-4 py-2.5" style={{ borderBottom: "1px solid var(--gekko-border)" }}>
+                <div className="text-sm font-bold text-white truncate">{user?.name ?? "Eswan Holl"}</div>
+                <div className="text-xs truncate mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>
+                  {user?.email ?? "eswan@gekkotech.co.za"}
+                </div>
+              </div>
+              <button
+                onClick={() => { setUserMenuOpen(false); logout(); }}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm font-semibold transition-colors duration-150"
+                style={{ color: "rgba(255,255,255,0.7)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
+                  e.currentTarget.style.color = "white";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                }}
+              >
+                <LogOut size={14} />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* ── Page content ─────────────────────────────────────────────────── */}
+      <main className="flex-1 w-full">
         {children}
       </main>
 
