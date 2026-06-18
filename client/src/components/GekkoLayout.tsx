@@ -6,7 +6,7 @@ import {
   BookOpen,
   CheckSquare,
   LogOut,
-  Upload,
+  Rocket,
   Zap,
   ChevronDown,
 } from "lucide-react";
@@ -85,7 +85,7 @@ export default function GekkoLayout({ children }: GekkoLayoutProps) {
     {
       label: "Publish Queue",
       path: "/publish",
-      icon: <Upload size={15} />,
+      icon: <Rocket size={15} />,
       badge: publishPendingCount > 0 ? publishPendingCount : undefined,
     },
   ];

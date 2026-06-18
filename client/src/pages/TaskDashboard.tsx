@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   X,
+  Layers,
 } from "lucide-react";
 import { StatusBadge, PriorityBadge } from "@/components/gekko/Badges";
 import TaskActionGroup from "@/components/gekko/TaskActionGroup";
@@ -139,14 +140,19 @@ function ProjectGroup({
     <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full px-4 py-2.5 text-left"
+        className="flex items-center gap-2.5 w-full px-5 py-3.5 text-left transition-colors duration-150"
         style={{ borderBottom: open ? "1px solid var(--gekko-border)" : "none" }}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
       >
-        <span style={{ color: "rgba(255,255,255,0.5)" }}>
+        <span style={{ color: "var(--gekko-green)", flexShrink: 0 }}>
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
-        <span className="font-bold text-white text-sm flex-1">{name}</span>
-        <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>
+        <span className="font-black text-white text-sm flex-1 tracking-wide">{name}</span>
+        <span
+          className="text-xs px-2 py-0.5 rounded-full font-bold"
+          style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.75)" }}
+        >
           {tasks.length}
         </span>
       </button>
@@ -235,27 +241,30 @@ export default function TaskDashboard() {
     });
   };
 
-  // Group tasks by project
+  // Normalise project names to canonical display names
+  const normaliseProjectName = (raw: string): string => {
+    const map: Record<string, string> = {
+      "Gai Command Center": "Gai Command Centre",
+      "Gai Command Center Build": "Gai Command Centre",
+    };
+    return map[raw] ?? raw;
+  };
+
+  // Group tasks by normalised project display name (merges duplicates)
   const grouped = useMemo(() => {
     const map = new Map<string, GaiTask[]>();
     for (const task of tasks ?? []) {
-      const key = task.project_id ?? "__unassigned__";
+      const rawName = task.project_id
+        ? projects?.find((p) => p.id === task.project_id)?.name ?? "Unassigned"
+        : "Unassigned";
+      const key = normaliseProjectName(rawName);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(task);
     }
     return map;
-  }, [tasks]);
+  }, [tasks, projects]);
 
-  const getGroupName = (key: string) => {
-    if (key === "__unassigned__") return "Unassigned";
-    const raw = projects?.find((p) => p.id === key)?.name ?? key;
-    // Normalise variant spellings to canonical GekkoFlow names
-    const normalise: Record<string, string> = {
-      "Gai Command Center": "Gai Command Centre",
-      "Gai Command Center Build": "Gai Command Centre",
-    };
-    return normalise[raw] ?? raw;
-  };
+  const getGroupName = (key: string) => key;
 
   const projectList = projects ?? [];
 
@@ -264,21 +273,23 @@ export default function TaskDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-black text-white flex items-center gap-2.5 tracking-tight">
             <CheckSquare size={22} style={{ color: "var(--gekko-green)" }} />
             Task Dashboard
           </h1>
-          {urlFilter && (
-            <p className="text-sm mt-0.5 font-semibold" style={{ color: "var(--gekko-green)" }}>
-              Showing: {urlFilter === "awaiting" ? "Awaiting Action" : urlFilter === "done_today" ? "Done Today" : urlFilter === "in_progress" ? "In Progress" : "Urgent"}
-            </p>
-          )}
+          <p className="text-sm mt-1 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>
+            {urlFilter
+              ? `Filtered: ${urlFilter === "awaiting" ? "Awaiting Action" : urlFilter === "done_today" ? "Done Today" : urlFilter === "in_progress" ? "In Progress" : "Urgent"}`
+              : `${tasks?.length ?? 0} task${(tasks?.length ?? 0) !== 1 ? "s" : ""} across ${grouped.size} project${grouped.size !== 1 ? "s" : ""}`}
+          </p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150 active:scale-95"
           style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)", color: "rgba(255,255,255,0.8)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--gekko-green)"; e.currentTarget.style.color = "var(--gekko-green)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--gekko-border)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
         >
           <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
           Refresh
@@ -288,7 +299,7 @@ export default function TaskDashboard() {
       {/* Filter bar */}
       {!urlFilter && (
         <div
-          className="flex flex-wrap items-center gap-3 p-3 rounded-lg"
+          className="flex flex-wrap items-center gap-3 p-4 rounded-xl"
           style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}
         >
           {/* Search */}
@@ -312,8 +323,8 @@ export default function TaskDashboard() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2 py-1.5 rounded text-sm text-white"
-            style={{ backgroundColor: "var(--gekko-black)", border: "1px solid var(--gekko-border)" }}
+            className="px-3 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: "var(--gekko-black)", border: "1px solid var(--gekko-border)", fontFamily: "'Nunito', sans-serif" }}
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.filter(Boolean).map((s) => (
@@ -325,8 +336,8 @@ export default function TaskDashboard() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-2 py-1.5 rounded text-sm text-white"
-            style={{ backgroundColor: "var(--gekko-black)", border: "1px solid var(--gekko-border)" }}
+            className="px-3 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: "var(--gekko-black)", border: "1px solid var(--gekko-border)", fontFamily: "'Nunito', sans-serif" }}
           >
             <option value="">All Priorities</option>
             {PRIORITY_OPTIONS.filter(Boolean).map((p) => (
@@ -335,12 +346,12 @@ export default function TaskDashboard() {
           </select>
 
           {/* Done toggle */}
-          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: "rgba(255,255,255,0.7)" }}>
+          <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ color: "rgba(255,255,255,0.75)" }}>
             <input
               type="checkbox"
               checked={includeDone}
               onChange={(e) => setIncludeDone(e.target.checked)}
-              style={{ accentColor: "var(--gekko-green)" }}
+              style={{ accentColor: "var(--gekko-green)", width: "15px", height: "15px" }}
             />
             Show completed
           </label>
@@ -348,14 +359,15 @@ export default function TaskDashboard() {
           {/* Bulk mode */}
           <button
             onClick={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()); }}
-            className="px-2.5 py-1.5 rounded text-xs font-semibold transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-150"
             style={{
               backgroundColor: bulkMode ? "rgba(0,255,65,0.15)" : "rgba(255,255,255,0.07)",
-              color: bulkMode ? "var(--gekko-green)" : "rgba(255,255,255,0.7)",
-              border: bulkMode ? "1px solid var(--gekko-green-border)" : "1px solid transparent",
+              color: bulkMode ? "var(--gekko-green)" : "rgba(255,255,255,0.75)",
+              border: bulkMode ? "1px solid rgba(0,255,65,0.3)" : "1px solid var(--gekko-border)",
             }}
           >
-            Bulk Mode {bulkMode && `(${selectedIds.size})`}
+            <Layers size={12} />
+            Bulk {bulkMode && `(${selectedIds.size})`}
           </button>
         </div>
       )}
@@ -364,30 +376,32 @@ export default function TaskDashboard() {
       {urlFilter && (
         <button
           onClick={() => window.history.pushState({}, "", "/tasks")}
-          className="flex items-center gap-1.5 text-sm"
-          style={{ color: "rgba(255,255,255,0.5)" }}
+          className="flex items-center gap-1.5 text-sm font-bold transition-colors duration-150"
+          style={{ color: "rgba(255,255,255,0.45)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--gekko-green)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
         >
-          <X size={13} /> Clear filter
+          <X size={13} /> Clear filter — show all tasks
         </button>
       )}
 
       {/* Tasks */}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
-          <Loader2 size={16} className="animate-spin" />
+        <div className="flex items-center gap-2.5 text-sm py-6" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Loader2 size={16} className="animate-spin" style={{ color: "var(--gekko-green)" }} />
           Loading tasks...
         </div>
       ) : !tasks || tasks.length === 0 ? (
-        <div
-          className="p-10 rounded-lg text-center"
-          style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}
-        >
-          <CheckSquare size={32} className="mx-auto mb-3" style={{ color: "rgba(255,255,255,0.3)" }} />
-          <p className="text-white font-semibold">No tasks found</p>
-          <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>
-            Try adjusting your filters or check back after the next orchestrator cycle.
-          </p>
-        </div>
+      <div
+        className="p-10 rounded-xl text-center"
+        style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}
+      >
+        <CheckSquare size={36} className="mx-auto mb-4" style={{ color: "rgba(255,255,255,0.2)" }} />
+        <p className="text-white font-bold text-base">No tasks found</p>
+        <p className="text-sm mt-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+          Try adjusting your filters or check back after the next orchestrator cycle.
+        </p>
+      </div>
       ) : (
         <div className="space-y-3">
           {Array.from(grouped.entries()).map(([key, groupTasks]) => (

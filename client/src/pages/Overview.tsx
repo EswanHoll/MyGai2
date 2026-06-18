@@ -15,6 +15,9 @@ import {
   PauseCircle,
   Calendar,
   XCircle,
+  BookOpen,
+  ListChecks,
+  ArrowRight,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLocation } from "wouter";
@@ -89,14 +92,18 @@ function StatTile({
 
 function SectionPanel({
   title,
+  icon,
   children,
   badge,
   badgeColor,
+  footer,
 }: {
   title: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
   badge?: number;
   badgeColor?: string;
+  footer?: React.ReactNode;
 }) {
   return (
     <div
@@ -107,6 +114,7 @@ function SectionPanel({
         className="flex items-center gap-2.5 w-full px-5 py-4"
         style={{ borderBottom: "1px solid var(--gekko-border)" }}
       >
+        {icon && <span style={{ color: "var(--gekko-green)" }}>{icon}</span>}
         <span className="font-black text-white text-sm flex-1 tracking-wide">{title}</span>
         {badge !== undefined && badge > 0 && (
           <span
@@ -118,6 +126,11 @@ function SectionPanel({
         )}
       </div>
       <div className="p-4 flex-1">{children}</div>
+      {footer && (
+        <div className="px-4 pb-3" style={{ borderTop: "1px solid var(--gekko-border)" }}>
+          {footer}
+        </div>
+      )}
     </div>
   );
 }
@@ -349,6 +362,7 @@ export default function Overview() {
   const [, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
 
   const { data: stats, isLoading: statsLoading } = trpc.tasks.getStats.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -462,7 +476,7 @@ export default function Overview() {
         {/* LEFT: Gai Daily Brief */}
         <SectionPanel
           title="Gai Daily Brief"
-          
+          icon={<BookOpen size={15} />}
           badge={brief?.summary.errors}
           badgeColor="#f87171"
         >
@@ -565,9 +579,23 @@ export default function Overview() {
         {/* RIGHT: Action Required */}
         <SectionPanel
           title="Action Required"
-          
+          icon={<ListChecks size={15} />}
           badge={actionTasks?.length}
           badgeColor="#fbbf24"
+          footer={
+            actionTasks && actionTasks.length > 0 ? (
+              <button
+                onClick={() => { navigate("/tasks?filter=awaiting"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                className="flex items-center gap-1.5 mt-3 text-xs font-bold transition-colors duration-150"
+                style={{ color: "rgba(255,255,255,0.45)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--gekko-green)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
+              >
+                View all {actionTasks.length} tasks in Task Dashboard
+                <ArrowRight size={12} />
+              </button>
+            ) : undefined
+          }
         >
           {tasksLoading ? (
             <div className="flex items-center gap-2 text-sm py-4" style={{ color: "rgba(255,255,255,0.5)" }}>

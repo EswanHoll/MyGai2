@@ -82,3 +82,19 @@
 - [x] Add tasks.createQuick tRPC procedure
 - [x] Add vitest tests for addReply and createQuick (37/37 passing)
 - [x] Save checkpoint and deliver published URL
+
+## Phase 12: Design Polish Pass
+- [x] Remove collapse arrows from Overview panels (Gai Daily Brief + Action Required always open)
+- [x] Task Dashboard — collapse arrows on project group headers only
+- [x] Fix all raw DB values to human-readable labels (eswan_approval, worker_agent, go_ahead, etc.)
+- [x] Normalise duplicate project names (Gai Command Center → Gai Command Centre)
+- [x] Fix brief.getByDate — replace maybeSingle with limit(1) for multi-row date handling
+- [x] Switch sidebar to top navigation bar for full-width layout
+- [x] Replace Upload icon with Rocket for Publish Queue nav item
+- [x] Fix Publish Queue subtitle and card design
+- [x] Task Dashboard — merge duplicate project groups by display name
+- [x] Task Dashboard — improve filter bar, header subtitle with task/project count
+- [x] Daily Brief — section icons, paginated Eswan's Actions, better row spacing
+- [x] Overview — section header icons, "View all" link at bottom of Action Required
+- [x] All pages — consistent Refresh button hover state (green border + text)
+- [x] TypeScript: 0 errors | Tests: 37/37 passing

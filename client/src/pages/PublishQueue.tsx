@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useCallback } from "react";
-import { CheckCircle2, ExternalLink, Loader2, RefreshCw, Upload } from "lucide-react";
+import { CheckCircle2, ExternalLink, Loader2, RefreshCw, Rocket, Calendar, User } from "lucide-react";
 import { toast } from "sonner";
 import type { GaiTask } from "../../../server/gekkodb";
 
@@ -43,19 +43,21 @@ export default function PublishQueue() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Upload size={22} style={{ color: "var(--gekko-green)" }} />
+          <h1 className="text-2xl font-black text-white flex items-center gap-2.5 tracking-tight">
+            <Rocket size={22} style={{ color: "var(--gekko-green)" }} />
             Publish Queue
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Webdev deployments ready to publish
+          <p className="text-sm mt-1 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>
+            Completed worker agent deliverables awaiting review and publish
           </p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150 active:scale-95"
           style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)", color: "rgba(255,255,255,0.8)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--gekko-green)"; e.currentTarget.style.color = "var(--gekko-green)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--gekko-border)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
         >
           <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
           Refresh
@@ -64,18 +66,18 @@ export default function PublishQueue() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
-          <Loader2 size={16} className="animate-spin" />
+        <div className="flex items-center gap-2.5 text-sm py-6" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Loader2 size={16} className="animate-spin" style={{ color: "var(--gekko-green)" }} />
           Loading publish queue...
         </div>
       ) : publishItems.length === 0 ? (
         <div
-          className="p-12 rounded-lg text-center"
+          className="p-12 rounded-xl text-center"
           style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}
         >
-          <CheckCircle2 size={40} className="mx-auto mb-3" style={{ color: "var(--gekko-green)" }} />
-          <p className="text-white font-bold text-lg">No deployments pending publish</p>
-          <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Rocket size={40} className="mx-auto mb-4" style={{ color: "rgba(255,255,255,0.2)" }} />
+          <p className="text-white font-bold text-base">Queue is clear</p>
+          <p className="text-sm mt-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
             All worker agent deliverables have been published.
           </p>
         </div>
@@ -84,12 +86,14 @@ export default function PublishQueue() {
           {publishItems.map((task) => (
             <div
               key={task.id}
-              className="flex items-center gap-4 p-4 rounded-lg"
+              className="flex items-start gap-4 p-5 rounded-xl transition-colors duration-150"
               style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--gekko-card-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--gekko-card)")}
             >
               {/* Task info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="font-bold text-white text-sm truncate">{task.name}</span>
                   {task.manus_task_id && (
                     <a
@@ -103,10 +107,21 @@ export default function PublishQueue() {
                     </a>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-                  <span>Project: {getProjectName(task)}</span>
-                  <span>Completed: {new Date(task.updated_at).toLocaleDateString()}</span>
-                  {task.agent_type && <span>Agent: {task.agent_type}</span>}
+                <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                  <span className="flex items-center gap-1">
+                    <Rocket size={11} />
+                    {getProjectName(task)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar size={11} />
+                    {new Date(task.updated_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                  {task.agent_type && (
+                    <span className="flex items-center gap-1">
+                      <User size={11} />
+                      {task.agent_type === "worker_agent" ? "Worker Agent" : task.agent_type}
+                    </span>
+                  )}
                 </div>
               </div>
 
