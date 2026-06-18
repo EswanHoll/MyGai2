@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useCallback } from "react";
+import { formatDelegatedTo, formatEswanAction, formatPriority, formatStatus } from "@/lib/labels";
 import {
   AlertCircle,
   CheckCircle2,
@@ -14,11 +15,8 @@ import {
   PauseCircle,
   Calendar,
   XCircle,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCollapsible } from "@/hooks/useCollapsible";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import GoAheadModal from "@/components/gekko/GoAheadModal";
@@ -87,42 +85,29 @@ function StatTile({
   );
 }
 
-// ─── Collapsible Section ─────────────────────────────────────────────────────
+// ─── Section Panel (always open) ─────────────────────────────────────────────
 
-function CollapsibleSection({
+function SectionPanel({
   title,
-  storageKey,
   children,
   badge,
   badgeColor,
 }: {
   title: string;
-  storageKey: string;
   children: React.ReactNode;
   badge?: number;
   badgeColor?: string;
 }) {
-  const [open, setOpen] = useCollapsible(storageKey, true);
-
   return (
     <div
       className="rounded-xl overflow-hidden flex flex-col"
       style={{ backgroundColor: "var(--gekko-card)", border: "1px solid var(--gekko-border)" }}
     >
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2.5 w-full px-5 py-4 text-left transition-colors duration-150"
-        style={{ borderBottom: open ? "1px solid var(--gekko-border)" : "none" }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)")}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+      <div
+        className="flex items-center gap-2.5 w-full px-5 py-4"
+        style={{ borderBottom: "1px solid var(--gekko-border)" }}
       >
-        <span
-          className="transition-transform duration-200 shrink-0"
-          style={{ color: "var(--gekko-green)" }}
-        >
-          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        </span>
-        <span className="font-bold text-white text-sm flex-1 tracking-wide">{title}</span>
+        <span className="font-black text-white text-sm flex-1 tracking-wide">{title}</span>
         {badge !== undefined && badge > 0 && (
           <span
             className="flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-bold"
@@ -131,8 +116,8 @@ function CollapsibleSection({
             {badge > 99 ? "99+" : badge}
           </span>
         )}
-      </button>
-      {open && <div className="p-4 flex-1">{children}</div>}
+      </div>
+      <div className="p-4 flex-1">{children}</div>
     </div>
   );
 }
@@ -264,19 +249,19 @@ function ActionTaskRow({ task, onRefresh }: { task: GaiTask; onRefresh: () => vo
             className="text-xs font-bold px-2 py-0.5 rounded-full"
             style={{ backgroundColor: `${pc}18`, color: pc, border: `1px solid ${pc}40` }}
           >
-            {(task.priority ?? "normal").charAt(0).toUpperCase() + (task.priority ?? "normal").slice(1)}
+            {formatPriority(task.priority)}
           </span>
           {/* Status badge */}
           <span
             className="text-xs font-bold px-2 py-0.5 rounded-full"
             style={{ backgroundColor: `${sc}18`, color: sc, border: `1px solid ${sc}40` }}
           >
-            {task.status.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+            {formatStatus(task.status)}
           </span>
           {/* Delegated to */}
           {task.delegated_to && (
-            <span className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>
-              → {task.delegated_to}
+            <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>
+              → {formatDelegatedTo(task.delegated_to)}
             </span>
           )}
         </div>
@@ -399,7 +384,7 @@ export default function Overview() {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px]" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="p-6 space-y-6" style={{ fontFamily: "'Nunito', sans-serif" }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -475,9 +460,9 @@ export default function Overview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
         {/* LEFT: Gai Daily Brief */}
-        <CollapsibleSection
+        <SectionPanel
           title="Gai Daily Brief"
-          storageKey="gekko_brief_open"
+          
           badge={brief?.summary.errors}
           badgeColor="#f87171"
         >
@@ -550,7 +535,7 @@ export default function Overview() {
                             backgroundColor: t.eswan_action === "cancel" ? "rgba(248,113,113,0.12)" : t.eswan_action === "go_ahead" ? "rgba(0,255,65,0.12)" : "rgba(251,191,36,0.12)",
                           }}
                         >
-                          {t.eswan_action}
+                          {formatEswanAction(t.eswan_action)}
                         </span>
                       </div>
                     ))}
@@ -575,12 +560,12 @@ export default function Overview() {
               </p>
             </div>
           )}
-        </CollapsibleSection>
+        </SectionPanel>
 
         {/* RIGHT: Action Required */}
-        <CollapsibleSection
+        <SectionPanel
           title="Action Required"
-          storageKey="gekko_action_open"
+          
           badge={actionTasks?.length}
           badgeColor="#fbbf24"
         >
@@ -604,7 +589,7 @@ export default function Overview() {
               </div>
             </div>
           )}
-        </CollapsibleSection>
+        </SectionPanel>
       </div>
     </div>
   );

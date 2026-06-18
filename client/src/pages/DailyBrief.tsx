@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { BookOpen, ChevronDown, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { StatusBadge } from "@/components/gekko/Badges";
+import { formatDelegatedTo, formatEswanAction, formatDateTab } from "@/lib/labels";
 
 // ─── Collapsible Section ─────────────────────────────────────────────────────
 
@@ -138,13 +139,14 @@ export default function DailyBrief() {
             <button
               key={d}
               onClick={() => setSelectedDate(d)}
-              className="px-2 py-0.5 rounded text-xs font-semibold transition-all"
+              className="px-2.5 py-1 rounded text-xs font-bold transition-all"
               style={{
                 backgroundColor: d === selectedDate ? "var(--gekko-green)" : "rgba(255,255,255,0.08)",
                 color: d === selectedDate ? "#000" : "rgba(255,255,255,0.7)",
+                border: d === selectedDate ? "none" : "1px solid var(--gekko-border)",
               }}
             >
-              {d}
+              {formatDateTab(d)}
             </button>
           ))}
         </div>
@@ -188,7 +190,7 @@ export default function DailyBrief() {
                     <span className="text-white font-semibold flex-1 truncate">{t.name}</span>
                     <span className="text-xs px-2 py-0.5 rounded font-semibold"
                       style={{ backgroundColor: "rgba(0,255,65,0.12)", color: "var(--gekko-green)" }}>
-                      {t.eswan_action}
+                      {formatEswanAction(t.eswan_action)}
                     </span>
                     <StatusBadge status={t.status as never} />
                     <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>
@@ -230,7 +232,7 @@ export default function DailyBrief() {
                     style={{ borderBottom: "1px solid var(--gekko-border)" }}>
                     <span className="text-white font-semibold flex-1 truncate">{t.name}</span>
                     <StatusBadge status={t.status as never} />
-                    <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>{t.delegated_to ?? "—"}</span>
+                    <span className="text-xs shrink-0 font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>{formatDelegatedTo(t.delegated_to)}</span>
                   </div>
                 ))}
               </div>
@@ -248,7 +250,7 @@ export default function DailyBrief() {
                     style={{ borderBottom: "1px solid var(--gekko-border)" }}>
                     <span className="text-white font-semibold flex-1 truncate">{t.name}</span>
                     <StatusBadge status={t.status as never} />
-                    <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>{t.delegated_to ?? "—"}</span>
+                    <span className="text-xs shrink-0 font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>{formatDelegatedTo(t.delegated_to)}</span>
                   </div>
                 ))}
               </div>
@@ -266,7 +268,7 @@ export default function DailyBrief() {
                     style={{ borderBottom: "1px solid var(--gekko-border)" }}>
                     <span className="text-white font-semibold flex-1 truncate">{t.name}</span>
                     <StatusBadge status={t.status as never} />
-                    <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>{t.delegated_to ?? "—"}</span>
+                    <span className="text-xs shrink-0 font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>{formatDelegatedTo(t.delegated_to)}</span>
                   </div>
                 ))}
               </div>

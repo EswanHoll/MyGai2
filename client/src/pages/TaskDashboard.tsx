@@ -16,6 +16,7 @@ import TaskActionGroup from "@/components/gekko/TaskActionGroup";
 import TaskDetailDrawer from "@/components/gekko/TaskDetailDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GaiTask } from "../../../server/gekkodb";
+import { formatDelegatedTo, formatStatus, formatPriority, formatDate } from "@/lib/labels";
 
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
@@ -63,8 +64,8 @@ function TaskRow({
           <TooltipTrigger asChild>
             <button
               onClick={() => onOpenDetail(task)}
-              className="text-sm font-semibold text-white truncate max-w-[200px] text-left hover:underline"
-              style={{ textDecorationColor: "var(--gekko-green)" }}
+              className="text-sm font-semibold text-white truncate text-left hover:underline"
+              style={{ textDecorationColor: "var(--gekko-green)", maxWidth: "clamp(200px, 40vw, 480px)" }}
             >
               {task.name}
             </button>
@@ -95,13 +96,13 @@ function TaskRow({
       </div>
 
       {/* Delegated to */}
-      <span className="text-xs shrink-0 hidden xl:block" style={{ color: "rgba(255,255,255,0.5)" }}>
-        {task.delegated_to ?? "—"}
+      <span className="text-xs shrink-0 hidden xl:block font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>
+        {formatDelegatedTo(task.delegated_to)}
       </span>
 
       {/* Created */}
       <span className="text-xs shrink-0 hidden lg:block" style={{ color: "rgba(255,255,255,0.4)" }}>
-        {new Date(task.created_at).toLocaleDateString()}
+        {formatDate(task.created_at)}
       </span>
 
       {/* Actions */}
@@ -247,7 +248,13 @@ export default function TaskDashboard() {
 
   const getGroupName = (key: string) => {
     if (key === "__unassigned__") return "Unassigned";
-    return projects?.find((p) => p.id === key)?.name ?? key;
+    const raw = projects?.find((p) => p.id === key)?.name ?? key;
+    // Normalise variant spellings to canonical GekkoFlow names
+    const normalise: Record<string, string> = {
+      "Gai Command Center": "Gai Command Centre",
+      "Gai Command Center Build": "Gai Command Centre",
+    };
+    return normalise[raw] ?? raw;
   };
 
   const projectList = projects ?? [];
@@ -262,8 +269,8 @@ export default function TaskDashboard() {
             Task Dashboard
           </h1>
           {urlFilter && (
-            <p className="text-sm mt-0.5" style={{ color: "var(--gekko-green)" }}>
-              Filtered: {urlFilter.replace("_", " ")}
+            <p className="text-sm mt-0.5 font-semibold" style={{ color: "var(--gekko-green)" }}>
+              Showing: {urlFilter === "awaiting" ? "Awaiting Action" : urlFilter === "done_today" ? "Done Today" : urlFilter === "in_progress" ? "In Progress" : "Urgent"}
             </p>
           )}
         </div>
@@ -310,7 +317,7 @@ export default function TaskDashboard() {
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.filter(Boolean).map((s) => (
-              <option key={s} value={s}>{s.replace("_", " ")}</option>
+              <option key={s} value={s}>{formatStatus(s)}</option>
             ))}
           </select>
 
@@ -323,7 +330,7 @@ export default function TaskDashboard() {
           >
             <option value="">All Priorities</option>
             {PRIORITY_OPTIONS.filter(Boolean).map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>{formatPriority(p)}</option>
             ))}
           </select>
 
