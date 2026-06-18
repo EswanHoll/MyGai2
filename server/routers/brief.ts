@@ -23,11 +23,12 @@ export const briefRouter = router({
           .lte("created_at", dateEnd)
           .order("created_at", { ascending: true }),
 
-        // Daily report for the date
+        // Daily report for the date — use limit(1) because there may be multiple rows per date
         db.schema("gai").from("daily_reports")
           .select("*")
           .eq("report_date", input.date)
-          .maybeSingle(),
+          .order("created_at", { ascending: false })
+          .limit(1),
 
         // Tasks with Eswan actions on this date
         db.schema("gai").from("tasks")
@@ -76,9 +77,10 @@ export const briefRouter = router({
       const tasksCompleted = completionLogs.length;
       const errors = errorLogs.length;
 
-      // Report content
+      // Report content — reportRes.data is now an array (limit 1), take first element
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const report = reportRes.data as any;
+      const reportRows = reportRes.data as any[];
+      const report = Array.isArray(reportRows) ? reportRows[0] : reportRows;
       const gmailHighlights = report?.content?.gmail_highlights ?? [];
 
       return {
