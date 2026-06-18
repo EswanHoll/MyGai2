@@ -156,4 +156,66 @@ export const tasksRouter = router({
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return data as GaiTask;
     }),
+
+  /**
+   * Add a reply/feedback note to gai.execution_logs for a task.
+   * This is Eswan's feedback channel back to Gai — distinct from eswan_action.
+   */
+  addReply: protectedProcedure
+    .input(
+      z.object({
+        task_id: z.string().uuid(),
+        message: z.string().min(1, "Reply cannot be empty"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getGekkoDB();
+      const { data, error } = await db.schema("gai").from("execution_logs").insert({
+        task_id: input.task_id,
+        action_type: "reply",
+        status: "info",
+        message: input.message,
+        details: { source: "eswan", channel: "gekkoflow_dashboard" },
+        created_at: new Date().toISOString(),
+      }).select().single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data;
+    }),
+
+  /**
+   * Create a quick task directly from the dashboard.
+   * Sets status=pending, delegated_to=eswan_approval so it lands in the Task Tracker.
+   */
+  createQuick: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, "Task name is required"),
+        priority: z.enum(["urgent", "high", "normal", "low"]).default("normal"),
+        notes: z.string().optional(),
+        project_id: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getGekkoDB();
+      const { data, error } = await db.schema("gai").from("tasks").insert({
+        name: input.name,
+        priority: input.priority,
+        notes: input.notes ?? null,
+        project_id: input.project_id ?? null,
+        status: "pending",
+        delegated_to: "eswan_approval",
+        agent_type: null,
+        eswan_action: null,
+        eswan_action_at: null,
+        eswan_notes: null,
+        rescheduled_to: null,
+        manus_task_id: null,
+        publish_ready: false,
+        published: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).select().single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data as GaiTask;
+    }),
 });

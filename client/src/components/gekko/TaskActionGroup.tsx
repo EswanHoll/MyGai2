@@ -30,6 +30,12 @@ export default function TaskActionGroup({ task, onActionComplete, compact = fals
     },
   });
 
+  const addReply = trpc.tasks.addReply.useMutation({
+    onError: (err) => {
+      toast.error(`Reply failed: ${err.message}`);
+    },
+  });
+
   const handleGoAhead = (notes: string) => {
     updateAction.mutate(
       { id: task.id, eswan_action: "go_ahead", eswan_notes: notes || undefined },
@@ -42,12 +48,16 @@ export default function TaskActionGroup({ task, onActionComplete, compact = fals
     );
   };
 
-  const handleReply = (notes: string) => {
-    updateAction.mutate(
-      { id: task.id, eswan_action: "go_ahead", eswan_notes: notes || undefined },
+  const handleReply = (message: string) => {
+    if (!message.trim()) {
+      toast.error("Reply cannot be empty");
+      return;
+    }
+    addReply.mutate(
+      { task_id: task.id, message: message.trim() },
       {
         onSuccess: () => {
-          toast.success("Reply sent to Gai");
+          toast.success("Reply logged to Gai execution log");
           setReplyOpen(false);
         },
       }
@@ -89,7 +99,7 @@ export default function TaskActionGroup({ task, onActionComplete, compact = fals
     ? "flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition-all duration-150 disabled:opacity-50"
     : "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold transition-all duration-150 disabled:opacity-50";
 
-  const isLoading = updateAction.isPending;
+  const isLoading = updateAction.isPending || addReply.isPending;
 
   return (
     <>

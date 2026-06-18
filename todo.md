@@ -73,3 +73,12 @@
 - [x] Visual review — no grey text on dark bg, all badges correct
 - [x] Responsive layout check (flex-wrap on stat tiles)
 - [x] Save checkpoint: "GekkoFlow Command Centre — Clean Build v1 — all 4 pages + 5 features"
+
+## Phase 11: Next Steps
+- [x] Wire Reply button — ReplyModal with note field, writes to gai.execution_logs via tRPC
+- [x] Add tasks.addReply tRPC procedure (inserts into gai.execution_logs with type='reply')
+- [x] Add Quick Task floating widget — FAB "+" button visible on all pages
+- [x] Add QuickTaskModal — name, priority, notes; creates gai.tasks (status=pending, delegated_to=eswan_approval)
+- [x] Add tasks.createQuick tRPC procedure
+- [x] Add vitest tests for addReply and createQuick (37/37 passing)
+- [x] Save checkpoint and deliver published URL

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import QuickTaskFAB from "./gekko/QuickTaskFAB";
 
 interface NavItem {
   label: string;
@@ -195,6 +196,9 @@ export default function GekkoLayout({ children }: GekkoLayoutProps) {
       <main className="flex-1 ml-60 min-h-screen" style={{ backgroundColor: "var(--gekko-black)" }}>
         {children}
       </main>
+
+      {/* ── Quick Task FAB ──────────────────────────────────────────────── */}
+      <QuickTaskFAB />
     </div>
   );
 }
