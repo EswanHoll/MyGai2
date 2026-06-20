@@ -9,6 +9,7 @@ import {
   Rocket,
   Zap,
   ChevronDown,
+  TrendingUp,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
@@ -88,6 +89,7 @@ export default function GekkoLayout({ children }: GekkoLayoutProps) {
       icon: <Rocket size={15} />,
       badge: publishPendingCount > 0 ? publishPendingCount : undefined,
     },
+    { label: "Growth", path: "/growth", icon: <TrendingUp size={15} /> },
   ];
 
   const isActive = (path: string) => {
