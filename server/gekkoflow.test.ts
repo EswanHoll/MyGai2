@@ -29,6 +29,7 @@ const mockTasks = [
     notes: null,
     publish_ready: false,
     published: false,
+    agent_profile: "manus-1.6",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -49,6 +50,7 @@ const mockTasks = [
     notes: null,
     publish_ready: false,
     published: false,
+    agent_profile: "manus-1.6-lite",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -69,6 +71,7 @@ const mockTasks = [
     notes: null,
     publish_ready: true,
     published: false,
+    agent_profile: "manus-1.6-max",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -139,13 +142,17 @@ function buildMockQuery(rows: typeof mockTasks) {
   return builder;
 }
 
-vi.mock("./gekkodb", () => ({
-  getGekkoDB: vi.fn(() => ({
-    schema: vi.fn((_schema: string) => ({
-      from: vi.fn((_table: string) => buildMockQuery(mockTasks)),
+vi.mock("./gekkodb", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./gekkodb")>();
+  return {
+    ...actual,
+    getGekkoDB: vi.fn(() => ({
+      schema: vi.fn((_schema: string) => ({
+        from: vi.fn((_table: string) => buildMockQuery(mockTasks)),
+      })),
     })),
-  })),
-}));
+  };
+});
 
 // ─── Context helpers ──────────────────────────────────────────────────────────
 
@@ -502,6 +509,88 @@ describe("tasks.createQuick", () => {
     const caller = appRouter.createCaller(makeAnonCtx());
     await expect(
       caller.tasks.createQuick({ name: "Test", priority: "normal" })
+    ).rejects.toThrow();
+  });
+
+  it("accepts agent_profile: manus-1.6-lite", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    const result = await caller.tasks.createQuick({
+      name: "Simple bounded task",
+      priority: "low",
+      agent_profile: "manus-1.6-lite",
+    });
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty("id");
+  });
+
+  it("accepts agent_profile: manus-1.6-max", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    const result = await caller.tasks.createQuick({
+      name: "Complex architecture build",
+      priority: "urgent",
+      agent_profile: "manus-1.6-max",
+    });
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty("id");
+  });
+
+  it("rejects invalid agent_profile value", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    await expect(
+      caller.tasks.createQuick({
+        name: "Bad tier task",
+        // @ts-expect-error intentional bad value
+        agent_profile: "manus-2.0-ultra",
+      })
+    ).rejects.toThrow();
+  });
+});
+
+describe("tasks.updateTask", () => {
+  it("updates a task and returns the updated task", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    const result = await caller.tasks.updateTask({
+      id: TASK_ID_1,
+      name: "Updated Task Alpha",
+      priority: "high",
+      agent_profile: "manus-1.6-max",
+    });
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty("id");
+  });
+
+  it("accepts partial update (agent_profile only)", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    const result = await caller.tasks.updateTask({
+      id: TASK_ID_2,
+      agent_profile: "manus-1.6-lite",
+    });
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty("id");
+  });
+
+  it("rejects invalid task id (non-UUID)", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    await expect(
+      caller.tasks.updateTask({ id: "not-a-uuid", name: "Test" })
+    ).rejects.toThrow();
+  });
+
+  it("rejects invalid agent_profile value", async () => {
+    const caller = appRouter.createCaller(makeAuthCtx());
+    await expect(
+      caller.tasks.updateTask({
+        id: TASK_ID_1,
+        // @ts-expect-error intentional bad value
+        agent_profile: "gpt-5",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const caller = appRouter.createCaller(makeAnonCtx());
+    await expect(
+      caller.tasks.updateTask({ id: TASK_ID_1, name: "Test" })
     ).rejects.toThrow();
   });
 });

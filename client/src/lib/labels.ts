@@ -50,6 +50,16 @@ export function formatDate(raw: string | null | undefined): string {
   }
 }
 
+export function formatAgentProfile(raw: string | null | undefined): string {
+  if (!raw) return "Standard";
+  const map: Record<string, string> = {
+    "manus-1.6-lite": "Light (manus-1.6-lite)",
+    "manus-1.6": "Standard (manus-1.6)",
+    "manus-1.6-max": "Max (manus-1.6-max)",
+  };
+  return map[raw] ?? raw;
+}
+
 export function formatDateTab(raw: string): string {
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);

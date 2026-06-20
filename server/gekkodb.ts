@@ -32,6 +32,17 @@ export type TaskStatus = "pending" | "in_progress" | "done" | "cancelled" | "blo
 export type TaskPriority = "urgent" | "high" | "normal" | "low";
 export type EswanAction = "go_ahead" | "hold" | "reschedule" | "cancel";
 
+/** Agent tier that will execute the task. Maps to ops.tasks.agent_profile. */
+export type AgentProfile = "manus-1.6-lite" | "manus-1.6" | "manus-1.6-max";
+
+export const AGENT_PROFILE_OPTIONS = [
+  { value: "manus-1.6-lite" as AgentProfile, label: "Light", description: "Simple / bounded tasks" },
+  { value: "manus-1.6" as AgentProfile, label: "Standard", description: "Most execution tasks" },
+  { value: "manus-1.6-max" as AgentProfile, label: "Max", description: "Complex builds and architecture work" },
+] as const;
+
+export const DEFAULT_AGENT_PROFILE: AgentProfile = "manus-1.6";
+
 export interface GaiTask {
   id: string;
   name: string;
@@ -49,6 +60,8 @@ export interface GaiTask {
   notes: string | null;
   publish_ready: boolean | null;
   published: boolean | null;
+  /** Agent tier for task execution. TEXT NOT NULL DEFAULT 'manus-1.6'. */
+  agent_profile: AgentProfile;
   created_at: string;
   updated_at: string;
 }

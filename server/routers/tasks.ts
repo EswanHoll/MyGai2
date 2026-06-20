@@ -1,7 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getGekkoDB, type GaiTask } from "../gekkodb";
+import { getGekkoDB, type GaiTask, AGENT_PROFILE_OPTIONS, DEFAULT_AGENT_PROFILE } from "../gekkodb";
 import { protectedProcedure, router } from "../_core/trpc";
+
+// ─── Shared schemas ───────────────────────────────────────────────────────────
+
+const AGENT_PROFILE_VALUES = AGENT_PROFILE_OPTIONS.map((o) => o.value) as
+  ["manus-1.6-lite", "manus-1.6", "manus-1.6-max"];
+
+const agentProfileSchema = z.enum(AGENT_PROFILE_VALUES).default(DEFAULT_AGENT_PROFILE);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -185,6 +192,7 @@ export const tasksRouter = router({
   /**
    * Create a quick task directly from the dashboard.
    * Sets status=pending, delegated_to=eswan_approval so it lands in the Task Tracker.
+   * agent_profile defaults to 'manus-1.6' (Standard) if not provided.
    */
   createQuick: protectedProcedure
     .input(
@@ -193,6 +201,7 @@ export const tasksRouter = router({
         priority: z.enum(["urgent", "high", "normal", "low"]).default("normal"),
         notes: z.string().optional(),
         project_id: z.string().uuid().optional(),
+        agent_profile: agentProfileSchema,
       })
     )
     .mutation(async ({ input }) => {
@@ -202,6 +211,7 @@ export const tasksRouter = router({
         priority: input.priority,
         notes: input.notes ?? null,
         project_id: input.project_id ?? null,
+        agent_profile: input.agent_profile,
         status: "pending",
         delegated_to: "eswan_approval",
         agent_type: null,
@@ -215,6 +225,43 @@ export const tasksRouter = router({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).select().single();
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return data as GaiTask;
+    }),
+
+  /**
+   * Update editable task fields: name, priority, notes, project_id, agent_profile.
+   * This is the general-purpose task edit mutation wired to the edit form.
+   */
+  updateTask: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().min(1, "Task name is required").optional(),
+        priority: z.enum(["urgent", "high", "normal", "low"]).optional(),
+        notes: z.string().optional(),
+        project_id: z.string().uuid().nullable().optional(),
+        agent_profile: agentProfileSchema.optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getGekkoDB();
+      const { id, ...fields } = input;
+      const updatePayload: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (fields.name !== undefined) updatePayload.name = fields.name;
+      if (fields.priority !== undefined) updatePayload.priority = fields.priority;
+      if (fields.notes !== undefined) updatePayload.notes = fields.notes;
+      if (fields.project_id !== undefined) updatePayload.project_id = fields.project_id;
+      if (fields.agent_profile !== undefined) updatePayload.agent_profile = fields.agent_profile;
+
+      const { data, error } = await db.schema("gai").from("tasks")
+        .update(updatePayload)
+        .eq("id", id)
+        .select()
+        .single();
+
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return data as GaiTask;
     }),

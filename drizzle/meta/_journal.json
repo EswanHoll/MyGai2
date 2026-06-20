@@ -9,5 +9,6 @@
       "tag": "0000_elite_joseph",
       "breakpoints": true
     }
-  ]
+  ],
+  "entries_note": "0001_agent_profile targets gai schema on Supabase — apply via SQL editor"
 }

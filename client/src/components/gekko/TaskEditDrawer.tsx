@@ -1,20 +1,27 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+/**
+ * TaskEditDrawer
+ * ──────────────
+ * Slide-in edit form for an existing GaiTask.
+ * Editable fields: name, priority, notes, project_id, agent_profile.
+ * Wired to: trpc.tasks.updateTask mutation.
+ *
+ * Opened from TaskDetailDrawer via the "Edit" button.
+ */
+
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Zap } from "lucide-react";
+import { Pencil } from "lucide-react";
 import AgentTierSelector, { DEFAULT_AGENT_TIER } from "./AgentTierSelector";
-import type { AgentProfile } from "../../../../server/gekkodb";
+import type { GaiTask, AgentProfile } from "../../../../server/gekkodb";
 
-interface QuickTaskModalProps {
-  open: boolean;
-  onClose: () => void;
-}
+// ─── Priority options ─────────────────────────────────────────────────────────
 
 const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgent", color: "#f87171" },
@@ -25,57 +32,63 @@ const PRIORITY_OPTIONS = [
 
 type Priority = "urgent" | "high" | "normal" | "low";
 
-export default function QuickTaskModal({ open, onClose }: QuickTaskModalProps) {
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface TaskEditDrawerProps {
+  task: GaiTask | null;
+  open: boolean;
+  onClose: () => void;
+  projects?: Array<{ id: string; name: string }>;
+  onSaved?: (updated: GaiTask) => void;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function TaskEditDrawer({ task, open, onClose, projects = [], onSaved }: TaskEditDrawerProps) {
   const [name, setName] = useState("");
   const [priority, setPriority] = useState<Priority>("normal");
   const [notes, setNotes] = useState("");
+  const [projectId, setProjectId] = useState<string>("");
   const [agentProfile, setAgentProfile] = useState<AgentProfile>(DEFAULT_AGENT_TIER);
-  const nameRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
 
-  const createQuick = trpc.tasks.createQuick.useMutation({
-    onSuccess: (task) => {
-      toast.success(`Task created: "${task.name}"`, {
-        description: "Added to Task Tracker — awaiting your Go Ahead.",
-      });
+  // Seed form from task whenever it changes or drawer opens
+  useEffect(() => {
+    if (task && open) {
+      setName(task.name ?? "");
+      setPriority((task.priority as Priority) ?? "normal");
+      setNotes(task.notes ?? "");
+      setProjectId(task.project_id ?? "");
+      setAgentProfile((task.agent_profile as AgentProfile) ?? DEFAULT_AGENT_TIER);
+    }
+  }, [task, open]);
+
+  const updateTask = trpc.tasks.updateTask.useMutation({
+    onSuccess: (updated) => {
+      toast.success(`Task updated: "${updated.name}"`);
       utils.tasks.getAll.invalidate();
       utils.tasks.getStats.invalidate();
-      handleClose();
+      onSaved?.(updated);
+      onClose();
     },
     onError: (err) => {
-      toast.error(`Failed to create task: ${err.message}`);
+      toast.error(`Failed to update task: ${err.message}`);
     },
   });
 
-  useEffect(() => {
-    if (open) {
-      setName("");
-      setPriority("normal");
-      setNotes("");
-      setAgentProfile(DEFAULT_AGENT_TIER);
-      setTimeout(() => nameRef.current?.focus(), 100);
-    }
-  }, [open]);
-
-  const handleClose = () => {
-    setName("");
-    setPriority("normal");
-    setNotes("");
-    setAgentProfile(DEFAULT_AGENT_TIER);
-    onClose();
-  };
-
-  const handleSubmit = () => {
+  const handleSave = () => {
+    if (!task) return;
     if (!name.trim()) {
       toast.error("Task name is required");
-      nameRef.current?.focus();
       return;
     }
-    createQuick.mutate({
+    updateTask.mutate({
+      id: task.id,
       name: name.trim(),
       priority,
       notes: notes.trim() || undefined,
+      project_id: projectId || null,
       agent_profile: agentProfile,
     });
   };
@@ -83,57 +96,47 @@ export default function QuickTaskModal({ open, onClose }: QuickTaskModalProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && e.ctrlKey) {
       e.preventDefault();
-      handleSubmit();
-    }
-    if (e.key === "Escape") {
-      handleClose();
+      handleSave();
     }
   };
+
+  if (!task) return null;
 
   const selectedPriority = PRIORITY_OPTIONS.find((p) => p.value === priority);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className="max-w-md"
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-[420px] sm:w-[480px] overflow-y-auto"
         style={{
           backgroundColor: "var(--gekko-card)",
-          border: "1px solid var(--gekko-border)",
+          borderLeft: "1px solid var(--gekko-border)",
           color: "white",
           fontFamily: "'Nunito', sans-serif",
         }}
         onKeyDown={handleKeyDown}
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white font-bold">
-            <Zap size={18} style={{ color: "var(--gekko-green)" }} />
-            Quick Task
-          </DialogTitle>
-        </DialogHeader>
+        <SheetHeader className="pb-4" style={{ borderBottom: "1px solid var(--gekko-border)" }}>
+          <SheetTitle className="text-white font-bold text-base flex items-center gap-2">
+            <Pencil size={16} style={{ color: "var(--gekko-green)" }} />
+            Edit Task
+          </SheetTitle>
+          <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+            {task.id}
+          </p>
+        </SheetHeader>
 
-        <div className="space-y-4 pt-2">
-          {/* Info banner */}
-          <div
-            className="px-3 py-2 rounded text-xs"
-            style={{ backgroundColor: "rgba(0,255,65,0.06)", border: "1px solid var(--gekko-green-border)" }}
-          >
-            <span style={{ color: "rgba(255,255,255,0.6)" }}>
-              Creates a task in the Task Tracker with status{" "}
-            </span>
-            <span className="font-bold" style={{ color: "#fbbf24" }}>Pending</span>
-            <span style={{ color: "rgba(255,255,255,0.6)" }}> — awaiting your Go Ahead.</span>
-          </div>
-
+        <div className="py-4 space-y-4">
           {/* Task name */}
           <div className="space-y-1.5">
             <Label className="text-white text-sm font-semibold">
               Task Name <span style={{ color: "#f87171" }}>*</span>
             </Label>
             <Input
-              ref={nameRef}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="What needs to be done?"
+              placeholder="Task name"
               className="text-white placeholder:text-white/40 text-sm"
               style={{
                 backgroundColor: "var(--gekko-black)",
@@ -182,8 +185,45 @@ export default function QuickTaskModal({ open, onClose }: QuickTaskModalProps) {
           <AgentTierSelector
             value={agentProfile}
             onChange={setAgentProfile}
-            disabled={createQuick.isPending}
+            disabled={updateTask.isPending}
           />
+
+          {/* Project */}
+          {projects.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-white text-sm font-semibold">
+                Project{" "}
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>(optional)</span>
+              </Label>
+              <Select value={projectId} onValueChange={setProjectId}>
+                <SelectTrigger
+                  className="text-sm font-semibold text-white"
+                  style={{
+                    backgroundColor: "var(--gekko-black)",
+                    border: "1px solid var(--gekko-border)",
+                    fontFamily: "'Nunito', sans-serif",
+                  }}
+                >
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent
+                  style={{
+                    backgroundColor: "var(--gekko-card)",
+                    border: "1px solid var(--gekko-border)",
+                  }}
+                >
+                  <SelectItem value="" className="text-sm font-semibold text-white/60">
+                    No project
+                  </SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-sm font-semibold text-white">
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-1.5">
@@ -195,7 +235,7 @@ export default function QuickTaskModal({ open, onClose }: QuickTaskModalProps) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Context, links, or instructions for Gai..."
-              rows={3}
+              rows={4}
               className="resize-none text-white placeholder:text-white/40 text-sm"
               style={{
                 backgroundColor: "var(--gekko-black)",
@@ -208,35 +248,35 @@ export default function QuickTaskModal({ open, onClose }: QuickTaskModalProps) {
               <kbd className="px-1 py-0.5 rounded text-xs" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
                 Ctrl+Enter
               </kbd>{" "}
-              to create
+              to save
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end pt-1">
+          <div className="flex gap-2 justify-end pt-2" style={{ borderTop: "1px solid var(--gekko-border)" }}>
             <Button
               variant="outline"
-              onClick={handleClose}
-              disabled={createQuick.isPending}
+              onClick={onClose}
+              disabled={updateTask.isPending}
               className="text-white border-white/20 hover:bg-white/10 font-semibold"
               style={{ backgroundColor: "transparent" }}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
-              disabled={createQuick.isPending || !name.trim()}
+              onClick={handleSave}
+              disabled={updateTask.isPending || !name.trim()}
               className="font-bold"
               style={{
                 backgroundColor: "var(--gekko-green)",
                 color: "#000",
               }}
             >
-              {createQuick.isPending ? "Creating..." : "Create Task"}
+              {updateTask.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
