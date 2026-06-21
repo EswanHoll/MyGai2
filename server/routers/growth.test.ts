@@ -183,6 +183,20 @@ vi.mock("../gekkodb", async (importOriginal) => {
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
+const DEFAULT_TENANT_CTX: TrpcContext["tenant"] = {
+  tenant_id: "00000000-0000-0000-0000-000000000000",
+  tenant: {
+    tenant_id: "00000000-0000-0000-0000-000000000000",
+    name: "GekkoTech Default Tenant",
+    tier: 1,
+    config: { is_default: true },
+    status: "active",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  is_default: true,
+};
+
 function makeAuthCtx(): TrpcContext {
   const user: AuthenticatedUser = {
     id: 1,
@@ -191,12 +205,14 @@ function makeAuthCtx(): TrpcContext {
     name: "Eswan Holl",
     loginMethod: "manus",
     role: "admin",
+    tenantId: "00000000-0000-0000-0000-000000000000",
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
   };
   return {
     user,
+    tenant: DEFAULT_TENANT_CTX,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };
@@ -205,6 +221,7 @@ function makeAuthCtx(): TrpcContext {
 function makeAnonCtx(): TrpcContext {
   return {
     user: null,
+    tenant: DEFAULT_TENANT_CTX,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };

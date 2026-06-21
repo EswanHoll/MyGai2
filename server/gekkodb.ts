@@ -43,8 +43,19 @@ export const AGENT_PROFILE_OPTIONS = [
 
 export const DEFAULT_AGENT_PROFILE: AgentProfile = "manus-1.6";
 
+export interface GaiTenantConfig {
+  tenant_id: string;
+  name: string;
+  tier: number; // 1 to 5
+  config: Record<string, unknown>;
+  status: "active" | "inactive" | "suspended";
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GaiTask {
   id: string;
+  tenant_id: string;
   name: string;
   description: string | null;
   status: TaskStatus;
@@ -68,6 +79,7 @@ export interface GaiTask {
 
 export interface GaiProject {
   id: string;
+  tenant_id: string;
   name: string;
   description: string | null;
   status: string | null;
@@ -76,6 +88,7 @@ export interface GaiProject {
 
 export interface GaiExecutionLog {
   id: string;
+  tenant_id: string;
   task_id: string | null;
   action_type: string | null;
   status: string | null;
@@ -86,6 +99,7 @@ export interface GaiExecutionLog {
 
 export interface GaiDailyReport {
   id: string;
+  tenant_id: string;
   report_date: string;
   content: {
     gmail_highlights?: Array<{ from: string; subject: string }>;

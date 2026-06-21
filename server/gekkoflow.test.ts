@@ -84,18 +84,25 @@ function buildMockQuery(rows: typeof mockTasks) {
 
   const chain = () => builder;
 
+  // Build a fully chainable count query object (handles .eq().is().in() etc.)
+  const makeCountChain = (len: number): Record<string, unknown> => {
+    const c: Record<string, unknown> = {};
+    const self = () => c;
+    c.eq = vi.fn(() => makeCountChain(len));
+    c.is = vi.fn(() => makeCountChain(len));
+    c.in = vi.fn(() => Promise.resolve({ count: len, error: null }));
+    c.not = vi.fn(() => Promise.resolve({ count: len, error: null }));
+    c.gte = vi.fn(() => makeCountChain(len));
+    c.lt = vi.fn(() => Promise.resolve({ count: len, error: null }));
+    c.then = (resolve: (v: unknown) => void) =>
+      Promise.resolve({ count: len, error: null }).then(resolve);
+    return c;
+  };
+
   builder.select = vi.fn((_cols?: string, _opts?: unknown) => {
-    // If head:true (count query), return count
+    // If head:true (count query), return a fully chainable count object
     if (_opts && typeof _opts === "object" && (_opts as Record<string, unknown>).head) {
-      return {
-        is: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ count: filtered.length, error: null })) })),
-        eq: vi.fn(() => ({
-          not: vi.fn(() => Promise.resolve({ count: filtered.length, error: null })),
-          gte: vi.fn(() => ({ lt: vi.fn(() => Promise.resolve({ count: filtered.length, error: null })) })),
-        })),
-        not: vi.fn(() => Promise.resolve({ count: filtered.length, error: null })),
-        in: vi.fn(() => Promise.resolve({ count: filtered.length, error: null })),
-      };
+      return makeCountChain(filtered.length);
     }
     return chain();
   });
@@ -117,7 +124,10 @@ function buildMockQuery(rows: typeof mockTasks) {
   builder.lt = vi.fn(() => chain());
   builder.lte = vi.fn(() => chain());
   builder.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
-  builder.single = vi.fn(() => Promise.resolve({ data: { ...filtered[0], eswan_action: "go_ahead", status: "cancelled" }, error: null }));
+  builder.single = vi.fn(() => {
+    const base = filtered[0] ?? { id: TASK_ID_1, name: "Task Alpha", status: "cancelled", priority: "urgent", agent_profile: "manus-1.6", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    return Promise.resolve({ data: { ...base, eswan_action: "go_ahead", status: "cancelled" }, error: null });
+  });
   builder.update = vi.fn(() => chain());
   builder.limit = vi.fn(() => chain());
 
@@ -158,6 +168,24 @@ vi.mock("./gekkodb", async (importOriginal) => {
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
+const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000000";
+
+const mockDefaultTenant = {
+  tenant_id: DEFAULT_TENANT_ID,
+  name: "GekkoTech Default Tenant",
+  tier: 1,
+  config: { is_default: true },
+  status: "active" as const,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+const defaultTenantCtx: TrpcContext["tenant"] = {
+  tenant_id: DEFAULT_TENANT_ID,
+  tenant: mockDefaultTenant,
+  is_default: true,
+};
+
 function makeAuthCtx(): TrpcContext {
   const user: AuthenticatedUser = {
     id: 1,
@@ -166,12 +194,14 @@ function makeAuthCtx(): TrpcContext {
     name: "Eswan Holl",
     loginMethod: "manus",
     role: "admin",
+    tenantId: DEFAULT_TENANT_ID,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
   };
   return {
     user,
+    tenant: defaultTenantCtx,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };
@@ -180,6 +210,7 @@ function makeAuthCtx(): TrpcContext {
 function makeAnonCtx(): TrpcContext {
   return {
     user: null,
+    tenant: defaultTenantCtx,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };

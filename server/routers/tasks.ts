@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getGekkoDB, type GaiTask, AGENT_PROFILE_OPTIONS, DEFAULT_AGENT_PROFILE } from "../gekkodb";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, tenantProcedure, router } from "../_core/trpc";
+import { createOrchestrator } from "../tenant/gaiOrchestrator";
 
 // ─── Shared schemas ───────────────────────────────────────────────────────────
 
@@ -32,82 +33,31 @@ type FilterInput = z.infer<typeof filterSchema>;
 
 export const tasksRouter = router({
   /**
-   * Fetch all tasks with optional filters.
+   * Fetch all tasks with optional filters — tenant-scoped.
    */
-  getAll: protectedProcedure
+  getAll: tenantProcedure
     .input(filterSchema.optional())
-    .query(async ({ input }) => {
-      const db = getGekkoDB();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query: any = db.schema("gai").from("tasks").select("*").order("created_at", { ascending: false });
-
-      const opts: FilterInput = input ?? { include_done: false };
-
-      if (opts.filter === "awaiting") {
-        query = query.is("eswan_action", null).in("status", ["pending", "in_progress"]);
-      } else if (opts.filter === "urgent") {
-        query = query.eq("priority", "urgent").not("status", "in", '("done","cancelled")');
-      } else if (opts.filter === "in_progress") {
-        query = query.eq("status", "in_progress");
-      } else if (opts.filter === "done_today") {
-        const todayStart = todayUTC().toISOString();
-        const tomorrowStart = new Date(todayUTC().getTime() + 86400000).toISOString();
-        query = query.eq("status", "done").gte("updated_at", todayStart).lt("updated_at", tomorrowStart);
-      } else {
-        if (opts.status) {
-          query = query.eq("status", opts.status);
-        } else if (!opts.include_done) {
-          query = query.not("status", "in", '("done","cancelled")');
-        }
-        if (opts.priority) query = query.eq("priority", opts.priority);
-        if (opts.project_id) query = query.eq("project_id", opts.project_id);
-        if (opts.search) query = query.ilike("name", `%${opts.search}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-      return (data ?? []) as GaiTask[];
+    .query(async ({ input, ctx }) => {
+      const orchestrator = createOrchestrator(ctx.tenant);
+      const result = await orchestrator.getTasks(input);
+      if (result.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+      return result.data ?? [];
     }),
 
   /**
-   * Fetch the 4 stat tile counts for the Overview page.
+   * Fetch the 4 stat tile counts for the Overview page — tenant-scoped.
    */
-  getStats: protectedProcedure.query(async () => {
-    const db = getGekkoDB();
-    const todayStart = todayUTC().toISOString();
-    const tomorrowStart = new Date(todayUTC().getTime() + 86400000).toISOString();
-
-    const [awaitingRes, urgentRes, inProgressRes, doneTodayRes] = await Promise.all([
-      db.schema("gai").from("tasks")
-        .select("id", { count: "exact", head: true })
-        .is("eswan_action", null)
-        .in("status", ["pending", "in_progress"]),
-      db.schema("gai").from("tasks")
-        .select("id", { count: "exact", head: true })
-        .eq("priority", "urgent")
-        .not("status", "in", '("done","cancelled")'),
-      db.schema("gai").from("tasks")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "in_progress"),
-      db.schema("gai").from("tasks")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "done")
-        .gte("updated_at", todayStart)
-        .lt("updated_at", tomorrowStart),
-    ]);
-
-    return {
-      awaiting: awaitingRes.count ?? 0,
-      urgent: urgentRes.count ?? 0,
-      in_progress: inProgressRes.count ?? 0,
-      done_today: doneTodayRes.count ?? 0,
-    };
+  getStats: tenantProcedure.query(async ({ ctx }) => {
+    const orchestrator = createOrchestrator(ctx.tenant);
+    const result = await orchestrator.getTaskStats();
+    if (result.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+    return result.data ?? { awaiting: 0, urgent: 0, in_progress: 0, done_today: 0 };
   }),
 
   /**
-   * Update eswan_action, eswan_action_at, eswan_notes, rescheduled_to on a task.
+   * Update eswan_action, eswan_action_at, eswan_notes, rescheduled_to on a task — tenant-scoped.
    */
-  updateAction: protectedProcedure
+  updateAction: tenantProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -116,7 +66,7 @@ export const tasksRouter = router({
         rescheduled_to: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getGekkoDB();
       const updatePayload: Record<string, unknown> = {
         eswan_action: input.eswan_action,
@@ -131,6 +81,7 @@ export const tasksRouter = router({
       const { data, error } = await db.schema("gai").from("tasks")
         .update(updatePayload)
         .eq("id", input.id)
+        .eq("tenant_id", ctx.tenant.tenant_id) // Tenant isolation enforced
         .select()
         .single();
 
@@ -139,25 +90,26 @@ export const tasksRouter = router({
     }),
 
   /**
-   * Fetch all gai.projects for grouping tasks.
+   * Fetch all gai.projects for grouping tasks — tenant-scoped.
    */
-  getProjects: protectedProcedure.query(async () => {
-    const db = getGekkoDB();
-    const { data, error } = await db.schema("gai").from("projects").select("*").order("name");
-    if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-    return (data ?? []) as Array<{ id: string; name: string; description: string | null; status: string | null; created_at: string }>;
+  getProjects: tenantProcedure.query(async ({ ctx }) => {
+    const orchestrator = createOrchestrator(ctx.tenant);
+    const result = await orchestrator.getProjects();
+    if (result.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+    return result.data ?? [];
   }),
 
   /**
-   * Mark a task as published.
+   * Mark a task as published — tenant-scoped.
    */
-  markPublished: protectedProcedure
+  markPublished: tenantProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getGekkoDB();
       const { data, error } = await db.schema("gai").from("tasks")
         .update({ published: true, updated_at: new Date().toISOString() })
         .eq("id", input.id)
+        .eq("tenant_id", ctx.tenant.tenant_id) // Tenant isolation enforced
         .select()
         .single();
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
@@ -165,36 +117,33 @@ export const tasksRouter = router({
     }),
 
   /**
-   * Add a reply/feedback note to gai.execution_logs for a task.
-   * This is Eswan's feedback channel back to Gai — distinct from eswan_action.
+   * Add a reply/feedback note to gai.execution_logs for a task — tenant-scoped.
    */
-  addReply: protectedProcedure
+  addReply: tenantProcedure
     .input(
       z.object({
         task_id: z.string().uuid(),
         message: z.string().min(1, "Reply cannot be empty"),
       })
     )
-    .mutation(async ({ input }) => {
-      const db = getGekkoDB();
-      const { data, error } = await db.schema("gai").from("execution_logs").insert({
+    .mutation(async ({ input, ctx }) => {
+      const orchestrator = createOrchestrator(ctx.tenant);
+      const result = await orchestrator.logExecution({
         task_id: input.task_id,
         action_type: "reply",
         status: "info",
         message: input.message,
         details: { source: "eswan", channel: "gekkoflow_dashboard" },
-        created_at: new Date().toISOString(),
-      }).select().single();
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-      return data;
+      });
+      if (result.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+      return result.data;
     }),
 
   /**
-   * Create a quick task directly from the dashboard.
-   * Sets status=pending, delegated_to=eswan_approval so it lands in the Task Tracker.
-   * agent_profile defaults to 'manus-1.6' (Standard) if not provided.
+   * Create a quick task directly from the dashboard — tenant-scoped.
+   * agent_profile is resolved via tenant config if not provided.
    */
-  createQuick: protectedProcedure
+  createQuick: tenantProcedure
     .input(
       z.object({
         name: z.string().min(1, "Task name is required"),
@@ -204,36 +153,23 @@ export const tasksRouter = router({
         agent_profile: agentProfileSchema,
       })
     )
-    .mutation(async ({ input }) => {
-      const db = getGekkoDB();
-      const { data, error } = await db.schema("gai").from("tasks").insert({
+    .mutation(async ({ input, ctx }) => {
+      const orchestrator = createOrchestrator(ctx.tenant);
+      const result = await orchestrator.createTask({
         name: input.name,
         priority: input.priority,
-        notes: input.notes ?? null,
-        project_id: input.project_id ?? null,
+        notes: input.notes,
+        project_id: input.project_id,
         agent_profile: input.agent_profile,
-        status: "pending",
-        delegated_to: "eswan_approval",
-        agent_type: null,
-        eswan_action: null,
-        eswan_action_at: null,
-        eswan_notes: null,
-        rescheduled_to: null,
-        manus_task_id: null,
-        publish_ready: false,
-        published: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).select().single();
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-      return data as GaiTask;
+      });
+      if (result.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+      return result.data as GaiTask;
     }),
 
   /**
-   * Update editable task fields: name, priority, notes, project_id, agent_profile.
-   * This is the general-purpose task edit mutation wired to the edit form.
+   * Update editable task fields — tenant-scoped.
    */
-  updateTask: protectedProcedure
+  updateTask: tenantProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -244,25 +180,10 @@ export const tasksRouter = router({
         agent_profile: agentProfileSchema.optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      const db = getGekkoDB();
-      const { id, ...fields } = input;
-      const updatePayload: Record<string, unknown> = {
-        updated_at: new Date().toISOString(),
-      };
-      if (fields.name !== undefined) updatePayload.name = fields.name;
-      if (fields.priority !== undefined) updatePayload.priority = fields.priority;
-      if (fields.notes !== undefined) updatePayload.notes = fields.notes;
-      if (fields.project_id !== undefined) updatePayload.project_id = fields.project_id;
-      if (fields.agent_profile !== undefined) updatePayload.agent_profile = fields.agent_profile;
-
-      const { data, error } = await db.schema("gai").from("tasks")
-        .update(updatePayload)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-      return data as GaiTask;
+    .mutation(async ({ input, ctx }) => {
+      const orchestrator = createOrchestrator(ctx.tenant);
+      const result = await orchestrator.updateTask(input);
+      if (result.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error });
+      return result.data as GaiTask;
     }),
 });

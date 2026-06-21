@@ -27,6 +27,19 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
 
   const ctx: TrpcContext = {
     user,
+    tenant: {
+      tenant_id: "00000000-0000-0000-0000-000000000000",
+      tenant: {
+        tenant_id: "00000000-0000-0000-0000-000000000000",
+        name: "GekkoTech Default Tenant",
+        tier: 1,
+        config: { is_default: true },
+        status: "active",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      is_default: true,
+    },
     req: {
       protocol: "https",
       headers: {},

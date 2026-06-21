@@ -17,6 +17,11 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** 
+   * tenantId for the user, mapping to the external gai.tenant_configs.
+   * Nullable initially for backward compatibility or global admins.
+   */
+  tenantId: varchar("tenantId", { length: 36 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -25,4 +30,5 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// Note: gai.tenant_configs and other gai tables are managed externally in Supabase
+// and defined in server/gekkodb.ts for type safety.
